@@ -59,28 +59,34 @@ export default function Board({ tasks, setTasks, allTasks }: BoardProps) {
   }
 
   async function handleAddTask(status: Status) {
-    const title = newTaskTitle[status].trim()
-    if (!title) return
+  const title = newTaskTitle[status].trim()
+  if (!title) return
 
-    const { data, error } = await supabase
-      .from('tasks')
-      .insert({
-        title,
-        status,
-        priority: newTaskPriority[status],
-        due_date: newTaskDueDate[status] || null,
-      })
-      .select()
-      .single()
+  const { data: { user } } = await supabase.auth.getUser()
 
-    if (!error && data) {
-      setTasks([...allTasks, data])
-      setNewTaskTitle(prev => ({ ...prev, [status]: '' }))
-      setNewTaskDueDate(prev => ({ ...prev, [status]: '' }))
-      setNewTaskPriority(prev => ({ ...prev, [status]: 'normal' }))
-      setAddingTo(null)
-    }
+  const { data, error } = await supabase
+    .from('tasks')
+    .insert({
+      title,
+      status,
+      priority: newTaskPriority[status],
+      due_date: newTaskDueDate[status] || null,
+      user_id: user?.id,
+    })
+    .select()
+    .single()
+
+  console.log('data:', data)
+  console.log('error:', error)
+
+  if (!error && data) {
+    setTasks([...allTasks, data])
+    setNewTaskTitle(prev => ({ ...prev, [status]: '' }))
+    setNewTaskDueDate(prev => ({ ...prev, [status]: '' }))
+    setNewTaskPriority(prev => ({ ...prev, [status]: 'normal' }))
+    setAddingTo(null)
   }
+}
 
   function handleUpdateTask(updated: Task) {
     setTasks(allTasks.map(t => t.id === updated.id ? updated : t))

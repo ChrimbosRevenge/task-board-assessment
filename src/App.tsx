@@ -16,18 +16,20 @@ export default function App() {
   }, [])
 
   async function initSession() {
-    try {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) {
-        const { error } = await supabase.auth.signInAnonymously()
-        if (error) throw error
-      }
-      await fetchTasks()
-    } catch (err: any) {
-      setError(err.message)
-      setLoading(false)
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    console.log('session:', session)
+    if (!session) {
+      const { error } = await supabase.auth.signInAnonymously()
+      console.log('sign in error:', error)
+      if (error) throw error
     }
+    await fetchTasks()
+  } catch (err: any) {
+    setError(err.message)
+    setLoading(false)
   }
+}
 
   async function fetchTasks() {
     try {
