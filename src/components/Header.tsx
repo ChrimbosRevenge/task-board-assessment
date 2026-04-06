@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import type { Task, TeamMember } from '../types'
 import TeamPanel from './TeamPanel'
 

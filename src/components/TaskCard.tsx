@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { format, isPast, isToday, addDays } from 'date-fns'
 import type { Task, TeamMember } from '../types'
 import { supabase } from '../lib/supabase'

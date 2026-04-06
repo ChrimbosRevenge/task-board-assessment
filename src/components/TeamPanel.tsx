@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import type { TeamMember } from '../types'
 import { MEMBER_COLORS } from '../types'
 import { supabase } from '../lib/supabase'
