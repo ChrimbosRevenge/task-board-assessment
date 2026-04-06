@@ -1,11 +1,12 @@
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { supabase } from './lib/supabase'
 import Board from './components/Board'
 import Header from './components/Header'
-import type { Task } from './types'
+import type { Task, TeamMember } from './types'
 
 export default function App() {
   const [tasks, setTasks] = useState<Task[]>([])
+  const [members, setMembers] = useState<TeamMember[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [search, setSearch] = useState('')
@@ -16,20 +17,18 @@ export default function App() {
   }, [])
 
   async function initSession() {
-  try {
-    const { data: { session } } = await supabase.auth.getSession()
-    console.log('session:', session)
-    if (!session) {
-      const { error } = await supabase.auth.signInAnonymously()
-      console.log('sign in error:', error)
-      if (error) throw error
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        const { error } = await supabase.auth.signInAnonymously()
+        if (error) throw error
+      }
+      await Promise.all([fetchTasks(), fetchMembers()])
+    } catch (err: any) {
+      setError(err.message)
+      setLoading(false)
     }
-    await fetchTasks()
-  } catch (err: any) {
-    setError(err.message)
-    setLoading(false)
   }
-}
 
   async function fetchTasks() {
     try {
@@ -43,6 +42,19 @@ export default function App() {
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function fetchMembers() {
+    try {
+      const { data, error } = await supabase
+        .from('team_members')
+        .select('*')
+        .order('created_at', { ascending: true })
+      if (error) throw error
+      setMembers(data || [])
+    } catch (err: any) {
+      console.error('Failed to fetch members:', err.message)
     }
   }
 
@@ -70,6 +82,8 @@ export default function App() {
     <div className="app">
       <Header
         tasks={tasks}
+        members={members}
+        setMembers={setMembers}
         search={search}
         setSearch={setSearch}
         priorityFilter={priorityFilter}
@@ -79,6 +93,7 @@ export default function App() {
         tasks={filteredTasks}
         setTasks={setTasks}
         allTasks={tasks}
+        members={members}
       />
     </div>
   )

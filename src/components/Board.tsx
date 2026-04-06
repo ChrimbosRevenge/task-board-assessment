@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd'
 import type { DropResult } from '@hello-pangea/dnd'
-import type { Task, Status } from '../types'
+import type { Task, Status, TeamMember } from '../types'
 import { COLUMNS } from '../types'
 import { supabase } from '../lib/supabase'
 import TaskCard from './TaskCard'
@@ -10,6 +10,7 @@ interface BoardProps {
   tasks: Task[]
   setTasks: (tasks: Task[]) => void
   allTasks: Task[]
+  members: TeamMember[]
 }
 
 const COLUMN_COLORS: Record<Status, string> = {
@@ -19,7 +20,7 @@ const COLUMN_COLORS: Record<Status, string> = {
   done: 'var(--col-done)',
 }
 
-export default function Board({ tasks, setTasks, allTasks }: BoardProps) {
+export default function Board({ tasks, setTasks, allTasks, members }: BoardProps) {
   const [newTaskTitle, setNewTaskTitle] = useState<Record<Status, string>>({
     todo: '', in_progress: '', in_review: '', done: ''
   })
@@ -30,6 +31,9 @@ export default function Board({ tasks, setTasks, allTasks }: BoardProps) {
   const [newTaskDueDate, setNewTaskDueDate] = useState<Record<Status, string>>({
     todo: '', in_progress: '', in_review: '', done: ''
   })
+  const [newTaskAssignees, setNewTaskAssignees] = useState<Record<Status, string[]>>({
+    todo: [], in_progress: [], in_review: [], done: []
+  })
 
   function getTasksForColumn(status: Status) {
     return tasks.filter(t => t.status === status)
@@ -37,6 +41,16 @@ export default function Board({ tasks, setTasks, allTasks }: BoardProps) {
 
   function getAllTasksForColumn(status: Status) {
     return allTasks.filter(t => t.status === status)
+  }
+
+  function toggleAssignee(status: Status, memberId: string) {
+    setNewTaskAssignees(prev => {
+      const current = prev[status]
+      const updated = current.includes(memberId)
+        ? current.filter(id => id !== memberId)
+        : [...current, memberId]
+      return { ...prev, [status]: updated }
+    })
   }
 
   async function handleDragEnd(result: DropResult) {
@@ -59,34 +73,33 @@ export default function Board({ tasks, setTasks, allTasks }: BoardProps) {
   }
 
   async function handleAddTask(status: Status) {
-  const title = newTaskTitle[status].trim()
-  if (!title) return
+    const title = newTaskTitle[status].trim()
+    if (!title) return
 
-  const { data: { user } } = await supabase.auth.getUser()
+    const { data: { user } } = await supabase.auth.getUser()
 
-  const { data, error } = await supabase
-    .from('tasks')
-    .insert({
-      title,
-      status,
-      priority: newTaskPriority[status],
-      due_date: newTaskDueDate[status] || null,
-      user_id: user?.id,
-    })
-    .select()
-    .single()
+    const { data, error } = await supabase
+      .from('tasks')
+      .insert({
+        title,
+        status,
+        priority: newTaskPriority[status],
+        due_date: newTaskDueDate[status] || null,
+        assignee_ids: newTaskAssignees[status],
+        user_id: user?.id,
+      })
+      .select()
+      .single()
 
-  console.log('data:', data)
-  console.log('error:', error)
-
-  if (!error && data) {
-    setTasks([...allTasks, data])
-    setNewTaskTitle(prev => ({ ...prev, [status]: '' }))
-    setNewTaskDueDate(prev => ({ ...prev, [status]: '' }))
-    setNewTaskPriority(prev => ({ ...prev, [status]: 'normal' }))
-    setAddingTo(null)
+    if (!error && data) {
+      setTasks([...allTasks, data])
+      setNewTaskTitle(prev => ({ ...prev, [status]: '' }))
+      setNewTaskDueDate(prev => ({ ...prev, [status]: '' }))
+      setNewTaskPriority(prev => ({ ...prev, [status]: 'normal' }))
+      setNewTaskAssignees(prev => ({ ...prev, [status]: [] }))
+      setAddingTo(null)
+    }
   }
-}
 
   function handleUpdateTask(updated: Task) {
     setTasks(allTasks.map(t => t.id === updated.id ? updated : t))
@@ -94,6 +107,10 @@ export default function Board({ tasks, setTasks, allTasks }: BoardProps) {
 
   function handleDeleteTask(id: string) {
     setTasks(allTasks.filter(t => t.id !== id))
+  }
+
+  function getInitials(name: string) {
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
   }
 
   return (
@@ -151,6 +168,30 @@ export default function Board({ tasks, setTasks, allTasks }: BoardProps) {
                       onChange={e => setNewTaskDueDate(prev => ({ ...prev, [column.id]: e.target.value }))}
                     />
                   </div>
+                  {members.length > 0 && (
+                    <div className="assignee-picker">
+                      <p className="assignee-picker-label">Assign to</p>
+                      <div className="assignee-picker-members">
+                        {members.map(member => {
+                          const selected = newTaskAssignees[column.id].includes(member.id)
+                          return (
+                            <button
+                              key={member.id}
+                              className={`assignee-pick-btn${selected ? ' assignee-pick-btn--selected' : ''}`}
+                              style={{
+                                background: selected ? member.color : 'var(--bg-hover)',
+                                borderColor: member.color,
+                              }}
+                              onClick={() => toggleAssignee(column.id, member.id)}
+                              title={member.name}
+                            >
+                              {getInitials(member.name)}
+                            </button>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
                   <div className="task-edit-actions">
                     <button className="btn-save" onClick={() => handleAddTask(column.id)}>
                       Add Task
@@ -185,6 +226,7 @@ export default function Board({ tasks, setTasks, allTasks }: BoardProps) {
                           >
                             <TaskCard
                               task={task}
+                              members={members}
                               onUpdate={handleUpdateTask}
                               onDelete={handleDeleteTask}
                             />

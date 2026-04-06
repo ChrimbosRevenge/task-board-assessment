@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { format, isPast, isToday, addDays } from 'date-fns'
-import type { Task } from '../types'
+import type { Task, TeamMember } from '../types'
 import { supabase } from '../lib/supabase'
 
 interface TaskCardProps {
   task: Task
+  members: TeamMember[]
   onUpdate: (updated: Task) => void
   onDelete: (id: string) => void
 }
@@ -37,15 +38,29 @@ function getDueDateInfo(due_date: string | null) {
   return { label: format(date, 'MMM d'), color: 'var(--due-ok)' }
 }
 
-export default function TaskCard({ task, onUpdate, onDelete }: TaskCardProps) {
+function getInitials(name: string) {
+  return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+}
+
+export default function TaskCard({ task, members, onUpdate, onDelete }: TaskCardProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [editTitle, setEditTitle] = useState(task.title)
   const [editDesc, setEditDesc] = useState(task.description || '')
   const [editPriority, setEditPriority] = useState(task.priority)
   const [editDueDate, setEditDueDate] = useState(task.due_date || '')
+  const [editAssignees, setEditAssignees] = useState<string[]>(task.assignee_ids || [])
   const [saving, setSaving] = useState(false)
 
   const dueDateInfo = getDueDateInfo(task.due_date)
+  const assignedMembers = members.filter(m => (task.assignee_ids || []).includes(m.id))
+
+  function toggleAssignee(memberId: string) {
+    setEditAssignees(prev =>
+      prev.includes(memberId)
+        ? prev.filter(id => id !== memberId)
+        : [...prev, memberId]
+    )
+  }
 
   async function handleSave() {
     if (!editTitle.trim()) return
@@ -55,6 +70,7 @@ export default function TaskCard({ task, onUpdate, onDelete }: TaskCardProps) {
       description: editDesc.trim() || null,
       priority: editPriority,
       due_date: editDueDate || null,
+      assignee_ids: editAssignees,
     }
     const { data, error } = await supabase
       .from('tasks')
@@ -108,6 +124,30 @@ export default function TaskCard({ task, onUpdate, onDelete }: TaskCardProps) {
             onChange={e => setEditDueDate(e.target.value)}
           />
         </div>
+        {members.length > 0 && (
+          <div className="assignee-picker">
+            <p className="assignee-picker-label">Assign to</p>
+            <div className="assignee-picker-members">
+              {members.map(member => {
+                const selected = editAssignees.includes(member.id)
+                return (
+                  <button
+                    key={member.id}
+                    className={`assignee-pick-btn${selected ? ' assignee-pick-btn--selected' : ''}`}
+                    style={{
+                      background: selected ? member.color : 'var(--bg-hover)',
+                      borderColor: member.color,
+                    }}
+                    onClick={() => toggleAssignee(member.id)}
+                    title={member.name}
+                  >
+                    {getInitials(member.name)}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
         <div className="task-edit-actions">
           <button className="btn-save" onClick={handleSave} disabled={saving}>
             {saving ? 'Saving...' : 'Save'}
@@ -141,6 +181,20 @@ export default function TaskCard({ task, onUpdate, onDelete }: TaskCardProps) {
       {dueDateInfo && (
         <div className="task-due-date" style={{ color: dueDateInfo.color }}>
           📅 {dueDateInfo.label}
+        </div>
+      )}
+      {assignedMembers.length > 0 && (
+        <div className="task-assignees">
+          {assignedMembers.map(member => (
+            <div
+              key={member.id}
+              className="task-avatar"
+              style={{ background: member.color }}
+              title={member.name}
+            >
+              {getInitials(member.name)}
+            </div>
+          ))}
         </div>
       )}
     </div>
