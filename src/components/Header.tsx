@@ -32,7 +32,7 @@ export default function Header({ tasks, members, setMembers, search, setSearch, 
         <div className="header-left">
           <div className="header-logo">
             <span className="header-logo-icon">⬡</span>
-            <span className="header-logo-text">TaskFlow</span>
+            <span className="header-logo-text">TaskHandler</span>
           </div>
           <div className="header-stats">
             <div className="stat">
